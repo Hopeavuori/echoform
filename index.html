@@ -800,23 +800,47 @@ window.addEventListener('DOMContentLoaded', () => {
   // näppäin 'u' → tuo UI takaisin
   document.addEventListener('keydown', e => { if (e.key.toLowerCase() === 'u') setUICollapsed(false); });
 
-  // alkuvaiheen mitoitus ja korjaus pienen viiveen jälkeen (osoitepalkki)
-  sizeCanvasToWindow();
-  setTimeout(sizeCanvasToWindow, 400);
-});
+// --- KOKO MITOITUSLOHKON KORJATTU VERSIO ---
 
-// reagoidaan koon muutoksiin luotettavasti
-['load','resize','orientationchange','visibilitychange'].forEach(ev => {
-  window.addEventListener(ev, () => {
-    clearTimeout(window.__rsz);
-    window.__rsz = setTimeout(sizeCanvasToWindow, ev === 'orientationchange' ? 300 : 120);
-  });
-});
+function sizeCanvasToWindow(){
+  const uiReserve = (window.innerWidth <= 768) ? 180 : 120; // tilaa UI:lle
+  const w = window.innerWidth;
+  const h = Math.max(200, window.innerHeight - uiReserve);
+  resizeCanvas(w, h, true);
+  if (srcImg) fitImageToCanvas();
+}
 
-// poista automaattinen focus
+// 1) Kun sivu latautuu: aja mitoitus useita kertoja (osoitepalkin takia)
 window.addEventListener('load', () => {
-  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  sizeCanvasToWindow();
+  setTimeout(sizeCanvasToWindow, 200);
+  setTimeout(sizeCanvasToWindow, 450);
+  setTimeout(sizeCanvasToWindow, 900);
 });
+
+// 2) Ruudun suunnan vaihto
+window.addEventListener('orientationchange', () => {
+  setTimeout(sizeCanvasToWindow, 300);
+});
+
+// 3) Ikkunan koon muutos (debounce)
+window.addEventListener('resize', () => {
+  clearTimeout(window.__rsz);
+  window.__rsz = setTimeout(sizeCanvasToWindow, 120);
+});
+
+// 4) Paluu sivulle selaimen välimuistista (bfcache)
+window.addEventListener('pageshow', (e) => {
+  if (e.persisted) setTimeout(sizeCanvasToWindow, 150);
+});
+
+// 5) Vieritys (osoitepalkin piiloutuminen mobiilissa)
+let __scrollTick;
+window.addEventListener('scroll', () => {
+  clearTimeout(__scrollTick);
+  __scrollTick = setTimeout(sizeCanvasToWindow, 120);
+}, { passive: true });
+
 
 
 
@@ -826,3 +850,4 @@ window.addEventListener('load', () => {
 </script>
 </body>
 </html>
+

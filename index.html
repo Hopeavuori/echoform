@@ -441,18 +441,58 @@ window.addEventListener('DOMContentLoaded', () => {
   setTimeout(sizeCanvasToWindow, 400);
 });
 
-/* koon muutoksiin reagointi */
-['load','resize','orientationchange','visibilitychange'].forEach(ev => {
+/* ---------------- CANVAS-KOKO & UI VASTAUS ---------------- */
+
+function sizeCanvasToWindow(){
+  const isMobile = window.matchMedia('(max-width: 768px)').matches;
+
+  const bar = document.getElementById('defaultImages');
+  const uiEl = document.getElementById('ui');
+
+  const barH = bar ? (bar.offsetHeight || 56) : 56;
+  const uiH  = (uiEl && !uiEl.classList.contains('collapsed'))
+              ? (isMobile ? 120 : 90)
+              : 0;
+
+  const reserve = barH + uiH;
+  const w = window.innerWidth;
+  const h = Math.max(200, window.innerHeight - reserve);
+
+  resizeCanvas(w, h, true);
+  if(srcImg) fitImageToCanvas();
+}
+
+/* resizing reagoi siististi */
+['load','resize','orientationchange','visibilitychange','pageshow'].forEach(ev => {
   window.addEventListener(ev, () => {
     clearTimeout(window.__rsz);
-    window.__rsz = setTimeout(sizeCanvasToWindow, ev === 'orientationchange' ? 300 : 120);
+    window.__rsz = setTimeout(sizeCanvasToWindow, 180);
   });
 });
 
-/* poista automaattinen focus sivun alussa */
-window.addEventListener('load', () => {
-  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+/* ---------------- UI COLLAPSE (SÄÄDÖT) ---------------- */
+
+function setUICollapsed(c){
+  const ui = document.getElementById('ui');
+  const btn = document.getElementById('uiToggle');
+  ui.classList.toggle('collapsed', c);
+  btn.textContent = c ? 'Säädöt ▴' : 'Säädöt ▾';
+  localStorage.setItem('uiCollapsed', c?'1':'0');
+  sizeCanvasToWindow();
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  const btn = document.getElementById('uiToggle');
+  const collapsed = localStorage.getItem('uiCollapsed') === '1';
+  setUICollapsed(collapsed);
+  btn.addEventListener('click', () => setUICollapsed(!collapsed));
 });
+
+/* ---------------- FOCUS POIS SIVUN AVAUKSESSA ---------------- */
+window.addEventListener('load', () => {
+  if (document.activeElement?.blur) document.activeElement.blur();
+});
+
 </script>
 </body>
 </html>

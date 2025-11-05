@@ -1,0 +1,831 @@
+<!doctype html>
+<html lang="fi">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Taidepeli — Metamorfoosi + Snap + Liikkeen sointi</title>
+<!-- p5.js ja p5.sound (kumpi tahansa CDN käy) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.2/p5.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.2/addons/p5.sound.min.js"></script>
+<style>
+  :root{ color-scheme: dark; }
+  body{ margin:0; background:#0e0e0e; color:#eee; font-family:system-ui, sans-serif;}
+  canvas{ display:block; margin:0 auto; outline:1px solid #1d1d1d; }
+  #ui{ position:fixed; left:10px; right:10px; bottom:10px; display:flex; gap:10px; flex-wrap:wrap; }
+  #ui>*{ background:#151515; padding:8px 10px; border-radius:12px; }
+  label{ display:flex; align-items:center; gap:8px; }
+  input[type="range"]{ width:140px; }
+  .hint{ opacity:.85 }
+  .pill{ cursor:pointer; user-select:none; }
+  #startAudio{
+    position:fixed; inset:50% auto auto 50%; transform:translate(-50%,-50%);
+    font-size:16px; padding:10px 16px; border-radius:12px; background:#2ab78b; color:#fff;
+    border:none; cursor:pointer; z-index:9999;
+  }
+ /* --- Kuvanappien fokus & aktiivinen tila (siisti versio) --- */
+
+ /* --- Kuvavalintanappien sijainti --- */
+/* #ui ylös sen verran, että napit mahtuvat alle */
+#ui{
+  position: fixed;
+  left: 10px;
+  right: 10px;
+  bottom: 60px;            /* <-- ennen 10px */
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* Kuvavalintanapit omalla rivillä alakulmassa */
+#defaultImages{
+  position: fixed;
+  left: 10px;
+  bottom: 10px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  z-index: 10000;          /* #ui:n yläpuolelle varmuuden vuoksi */
+}
+
+/* Perustyyli napeille (voit pitää omat inline-tyylitkin,
+   mutta tämä helpottaa jatkossa) */
+#defaultImages button{
+  background:#2ab78b;
+  color:#fff;
+  border:0;
+  border-radius:8px;
+  padding:6px 10px;
+  cursor:pointer;
+}
+
+
+
+/* Ei selaimen valkoista/vaaleaa fokus-kehystä */
+#defaultImages button:focus,
+#defaultImages button:focus-visible,
+#defaultImages button:focus-within {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+
+/* Poistaa automaattisen focus-renkaan Suojaani-napista sivun latauksessa */
+#btnSuojaani:focus-visible,
+#btnSuojaani:focus,
+#btnSuojaani:focus-within {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+
+
+/* Kevyt hover (valinnainen) */
+#defaultImages button:hover {
+  filter: brightness(1.05);
+}
+/* Nappien täydellinen resetointi */
+#defaultImages button{
+  -webkit-appearance: none;
+  appearance: none;
+  background: #2ab78b;
+  color: #fff;
+  border: 0 !important;             /* poistaa kehykset */
+  outline: 0 !important;            /* varmuudeksi */
+  box-shadow: none !important;      /* ei varjoa oletuksena */
+  border-radius: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+/* Poista kehysehdokkaat kaikissa tiloissa */
+#defaultImages button:focus,
+#defaultImages button:focus-visible,
+#defaultImages button:focus-within,
+#defaultImages button:active{
+  border: 0 !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+}
+
+/* Firefoxin sisäkehyksen poisto */
+#defaultImages button::-moz-focus-inner{
+  border: 0;
+}
+
+/* Valittu nappi näkyvästi tummempi */
+#defaultImages button.active-image{
+  background: #178c68 !important;
+  box-shadow: 0 0 8px rgba(42,183,139,.5);
+  transition: background .25s ease, box-shadow .25s ease, filter .2s ease;
+}
+/* Perus: sliderit ja labelit venyvät nätisti */
+#ui label{ width:auto; flex:1 1 320px; }
+#ui input[type="range"]{ width:100%; }
+
+/* Mobiilinäkymä */
+@media (max-width: 768px){
+  /* Tee kontrollipaneelista pystykolumni koko leveydelle */
+  #ui{
+    left: 10px;
+    right: 10px;
+    bottom: 96px;         /* jätä tilaa kuvapainikkeille */
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  /* Jokainen lohko täysleveänä, pienempi padding */
+  #ui > *{
+    width: 100%;
+    padding: 6px 8px;
+    border-radius: 10px;
+  }
+
+  /* Label + slider pinoon (teksti ylös, slider alle) */
+  #ui label{
+    flex: 1 1 auto;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+  }
+
+  /* Pienennä vinkkibanneria */
+  .hint{ font-size: 13px; line-height: 1.2; }
+
+  /* Kuvavalintanapit alareunaan, riviin, skrollattavaksi jos ahdasta */
+  #defaultImages{
+    position: fixed;
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
+    gap: 6px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+  #defaultImages button{
+    flex: 0 0 auto;        /* älä venytä */
+    padding: 8px 12px;
+    border-radius: 10px;
+  }
+
+  /* StartAudio-nappi pienemmäksi */
+  #startAudio{ font-size: 14px; padding: 8px 12px; }
+}
+input[type="range"]{ touch-action: none; }
+
+/* Kirjain-painikkeet (näkyvät mobiilissa, työpöydällä voi piilottaa) */
+.kb{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+.kb button{
+  width:36px; height:36px; border-radius:10px;
+  background:#2ab78b; color:#fff; border:0; cursor:pointer;
+  font-weight:700; line-height:36px; text-align:center;
+  transition: transform .1s ease, filter .15s ease;
+}
+.kb button:active{ transform:scale(.96); }
+.kb button.on{ background:#178c68; box-shadow:0 0 8px rgba(42,183,139,.5); }
+
+/* Mobiilissa täysleveän UI:n kanssa napit pysyvät siistinä rivinä */
+@media (max-width:768px){
+  .kb{ order:-1; } /* tuo napit UI:n alkuun */
+}
+
+/* (Valinnainen) piilota kirjainnapit desktopilla
+@media (min-width:769px){
+  .kb{ display:none; }
+}
+*/
+/* Kelluva "Säädöt" -nappi */
+#ui.collapsed{ display:none !important; }
+
+/* Kuvavalintanappien rivi + Säädöt */
+#defaultImages {
+  position: fixed;
+  bottom: 15px;
+  left: 15px;
+  right: 15px;
+  z-index: 9999;
+
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-start;
+  align-items: center;
+}
+
+/* Kaikki napit samannäköisiksi */
+#defaultImages button {
+  background: #2ab78b;
+  color: #fff;
+  border: 0;
+  border-radius: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+/* SÄÄDÖT-nappi työnnetään oikeaan reunaan */
+#uiToggle {
+  margin-left: auto;
+  font-weight: 600;
+}
+
+/* Valittu kuva */
+#defaultImages button.active-image {
+  background: #178c68;
+  box-shadow: 0 0 8px rgba(42,183,139,.5);
+}
+
+</style>
+</head>
+<body>
+<!-- Valitse kuva -->
+<div id="defaultImages">
+  <button id="btnSuojaani" type="button">Suojaani</button>
+  <button id="btnRed" type="button">Redgrid</button>
+  <button id="btnGreen" type="button">Greengrid</button>
+  <button id="btnBlack" type="button">Blackgrid</button>
+
+  <!-- ✅ Säädöt-nappi samaan riviin -->
+  <button id="uiToggle" type="button" aria-expanded="true">Säädöt ▾</button>
+</div>
+
+
+
+
+
+<button id="startAudio">▶ Käynnistä ääni</button>
+<button id="toggleSound" style="
+  position:fixed;top:15px;right:15px;
+  font-size:14px;padding:6px 10px;border-radius:10px;
+  background:#151515;color:#fff;border:1px solid #2ab78b;
+  cursor:pointer;display:none;z-index:9999;">
+  🔊 Ääni päällä
+</button>
+
+
+<div id="ui">
+  <div class="hint">
+    E = Edit/Play • O = Ghost • Klikkaa tyhjää: räjähdä/kokoonnu • S = PNG • J = JSON
+  </div>
+
+  <div class="kb">
+    <button id="kbE" type="button" title="Edit/Play">E</button>
+    <button id="kbO" type="button" title="Ghost">O</button>
+    <button id="kbExplode" type="button" title="Explode / Assemble">💥</button>
+    <button id="kbS" type="button" title="Save PNG">S</button>
+    <button id="kbJ" type="button" title="Save JSON">J</button>
+  </div>
+
+  <input type="file" id="picker" accept="image/*" />
+  <label>Palojen määrä <input type="range" id="pieces" min="60" max="500" value="220"></label>
+  <label>Metamorfoosi <input type="range" id="morph" min="0" max="1" step="0.01" value="0.55"></label>
+  <label>Paletti-gravitaatio <input type="range" id="palette" min="0" max="2" step="0.01" value="1.0"></label>
+  <label>Kasaantuminen <input type="range" id="cohere" min="0" max="1" step="0.01" value="0.10"></label>
+  <label>Hajotus <input type="range" id="explode" min="0" max="500" value="260"></label>
+  <label>Turbulenssi <input type="range" id="turb" min="0" max="2" step="0.01" value="0.6"></label>
+  <div class="pill" id="toggleMode">▶ Play</div>
+  <label>Snap-etäisyys <input type="range" id="snapRange" min="4" max="80" value="28"></label>
+  <label><input type="checkbox" id="snapOn" checked> Snap päällä</label>
+  <button id="reshuffle">Arvo palat</button>
+</div>
+
+<!-- ✅ UI:n ulkopuolella -->
+<button id="uiToggle" type="button" aria-expanded="true" title="Näytä/piilota säädöt">
+  Säädöt ▾
+</button>
+
+
+<script>
+/* ------------------ YLEISET ------------------ */
+let srcImg, gfx;
+let tiles = [];
+let exploding = true;
+let editMode = true;
+let showGhost = false;
+let seed = Math.floor(Math.random()*1e9);
+let dragging = null, dragOff;
+
+const ui = id => document.getElementById(id);
+const P  = () => ui('pieces').value|0;
+
+/* ------------------ ÄÄNI ------------------ */
+/* ------------------ ÄÄNI ------------------ */
+let audioStarted = false;
+let osc, filter, reverb;
+let soundOn = false; // uusi globaali tila
+
+// --- KUVAVÄLIMUISTI (nopeuttaa nappien käyttöä) ---
+const cache = {};
+
+function preload(){
+  // Esiladataan kuvat muistiin
+  ['hopeavuori_maija suojaani.png',
+   'hopeavuori_maija_redgrid.jpg',
+   'hopeavuori_maija_greengrid.jpg',
+   'hopeavuori_maija_blackgrid.jpg'
+  ].forEach(path => loadImage(path, img => cache[path] = img));
+}
+
+// Korvataan vanha useDefault tällä versiolla:
+function useDefault(path){
+  if (cache[path]) { 
+    setSourceImage(cache[path]); 
+    return; 
+  }
+  loadImage(path,
+    img => setSourceImage(img),
+    err => { 
+      console.error('Kuvan lataus epäonnistui:', path, err); 
+      alert('Kuvaa ei löytynyt: ' + path); 
+    }
+  );
+}
+function sizeCanvasToWindow(){
+  // jätä alareunaan tilaa UI:lle (noin 160 px mobiilissa)
+  const uiReserve = (window.innerWidth <= 768) ? 180 : 120;
+  const w = window.innerWidth;
+  const h = Math.max(200, window.innerHeight - uiReserve);
+  resizeCanvas(w, h, true);
+  if(srcImg){ fitImageToCanvas(); }  // päivitä kuvan skaalaus
+}
+
+// kutsu heti ja myös koon muuttuessa
+window.addEventListener('load', sizeCanvasToWindow);
+window.addEventListener('orientationchange', sizeCanvasToWindow);
+window.addEventListener('resize', () => {
+  clearTimeout(window.__rsz);
+  window.__rsz = setTimeout(sizeCanvasToWindow, 100); // debounce
+
+  // Aja mitoitus useamman kerran sivun valmistuttua, jotta osoitepalkin animaatio tulee huomioiduksi
+window.addEventListener('load', () => {
+  sizeCanvasToWindow();
+  setTimeout(sizeCanvasToWindow, 200);
+  setTimeout(sizeCanvasToWindow, 450);
+  setTimeout(sizeCanvasToWindow, 900);
+});
+
+// Kun selain tuo sivun “takaisin” (bfcache), mitoita uudelleen
+window.addEventListener('pageshow', (e) => {
+  if (e.persisted) {
+    setTimeout(sizeCanvasToWindow, 150);
+  }
+});
+
+// Jos osoitepalkki piiloutuu skrollissa, mitoita varmuuden vuoksi
+let __scrollTick;
+window.addEventListener('scroll', () => {
+  clearTimeout(__scrollTick);
+  __scrollTick = setTimeout(sizeCanvasToWindow, 120);
+}, { passive: true });
+
+});
+
+
+async function startAudio() {
+  try { userStartAudio(); } catch(e) {}
+  osc    = new p5.Oscillator('sine');
+  filter = new p5.LowPass();
+  reverb = new p5.Reverb();
+
+  osc.disconnect();
+  osc.connect(filter);
+  filter.connect(reverb);
+  reverb.process(filter, 3, 2); // pehmeä kaiku
+
+  osc.start();
+  osc.amp(0.12, 0.6); // fade-in
+  audioStarted = true;
+  soundOn = true;
+  ui('startAudio').style.display = 'none';
+
+ 
+
+
+  // Näytä ja aktivoi äänenhallintanappi
+  const soundBtn = document.getElementById('toggleSound');
+  soundBtn.style.display = 'block';
+  soundBtn.textContent = '🔊 Ääni päällä';
+
+  soundBtn.onclick = () => {
+    if (!audioStarted || !osc) return; // varmistus
+    soundOn = !soundOn;
+    if (soundOn) {
+      osc.amp(0.12, 0.4);
+      soundBtn.textContent = '🔊 Ääni päällä';
+    } else {
+      osc.amp(0.0, 0.4);
+      soundBtn.textContent = '🔇 Ääni pois';
+    }
+  };
+}
+ui('startAudio').addEventListener('click', startAudio);
+
+
+/* ------------------ P5 ELINKAARI ------------------ */
+function setup(){
+  const w = Math.min(window.innerWidth, 1200);
+  const h = Math.min(window.innerHeight-96, 820);
+  createCanvas(w, h);
+  background(14);
+  fill(230); noStroke(); textAlign(CENTER,CENTER); textSize(16);
+  text('Vedä ja pudota kuva tähän (tai käytä Valitse kuva)', width/2, height/2);
+
+  // dnd + picker
+  const cnv = document.querySelector('canvas');
+  cnv.addEventListener('dragover', e=>e.preventDefault());
+  cnv.addEventListener('drop', e=>{
+    e.preventDefault();
+    if(e.dataTransfer.files.length) loadFromFile(e.dataTransfer.files[0]);
+  });
+  ui('picker').addEventListener('change', e=>{
+    if(e.target.files.length) loadFromFile(e.target.files[0]);
+  });
+
+  ui('reshuffle').onclick = ()=>{ if(srcImg) makeTiles(); };
+  ui('toggleMode').onclick = ()=>toggleMode();
+}
+function windowResized(){
+  const w = Math.min(window.innerWidth, 1200);
+  const h = Math.min(window.innerHeight-96, 820);
+  resizeCanvas(w, h);
+  if(srcImg) fitImageToCanvas();
+}
+
+function loadFromFile(file){
+  const reader = new FileReader();
+  reader.onload = ev => {
+    loadImage(ev.target.result, img=>{
+      srcImg = img;
+      fitImageToCanvas();
+      makeTiles();
+    });
+  };
+  reader.readAsDataURL(file);
+}
+
+function fitImageToCanvas(){
+  gfx = createGraphics(width, height);
+  gfx.clear();
+  const s = Math.min(width/srcImg.width, height/srcImg.height);
+  const iw = srcImg.width*s, ih = srcImg.height*s;
+  const ix = (width-iw)/2, iy = (height-ih)/2;
+  gfx.image(srcImg, ix, iy, iw, ih);
+}
+
+/* ------------------ PALAT ------------------ */
+function sampleHue(g, x, y){
+  const c = g.get(Math.floor(x), Math.floor(y));
+  colorMode(RGB); const col = color(c[0],c[1],c[2]);
+  colorMode(HSB); const h = hue(col), s = saturation(col), b = brightness(col);
+  colorMode(RGB);
+  return {h,s,b};
+}
+
+function makeTiles(){
+  randomSeed(seed = Math.floor(Math.random()*1e9));
+  noiseSeed(seed);
+  tiles.length = 0;
+
+  const n = P();
+  const cols = Math.floor(Math.sqrt(n)*1.5);
+  const rows = Math.floor(n/cols);
+  const gw = width/cols, gh = height/rows;
+
+  for(let y=0;y<rows;y++){
+    for(let x=0;x<cols;x++){
+      if(tiles.length>=n) break;
+      const cx = (x+0.5)*gw + random(-gw*0.2, gw*0.2);
+      const cy = (y+0.5)*gh + random(-gh*0.2, gh*0.2);
+      const w = gw*random(0.7,1.2);
+      const h = gh*random(0.7,1.2);
+      const sx = constrain(cx-w/2,0,width-1);
+      const sy = constrain(cy-h/2,0,height-1);
+      const sw = constrain(w,4,width-sx);
+      const sh = constrain(h,4,height-sy);
+      const g = createGraphics(sw, sh);
+      g.image(gfx, -sx, -sy);
+
+      const hueSamp = sampleHue(gfx, sx+sw/2, sy+sh/2);
+      tiles.push({
+        img:g, hue:hueSamp.h, sat:hueSamp.s, bri:hueSamp.b,
+        home:createVector(cx,cy),
+        pos:createVector(cx + random(-40,40), cy + random(-40,40)),
+        vel:p5.Vector.random2D().mult(random(0.5,2)),
+        ang:random(TWO_PI), avel:random(-0.06,0.06),
+        size:createVector(sw,sh), scale:1, alpha:255,
+        shear:createVector(random(-0.12,0.12), random(-0.12,0.12))
+      });
+    }
+  }
+}
+
+/* ------------------ VUOROVAIKUTUS ------------------ */
+function toggleMode(){
+  editMode = !editMode;
+  ui('toggleMode').textContent = editMode ? '▶ Play' : '■ Edit';
+}
+
+function pointInTile(t, x, y){
+  const w = t.size.x * t.scale, h = t.size.y * t.scale;
+  return (x>t.pos.x-w/2 && x<t.pos.x+w/2 && y>t.pos.y-h/2 && y<t.pos.y+h/2);
+}
+
+function mousePressed(){
+  if(!srcImg) return;
+  let any = false;
+  for(let i=tiles.length-1; i>=0; i--){
+    const t = tiles[i];
+    if(pointInTile(t, mouseX, mouseY)){
+      any = true;
+      if(editMode){
+        dragging = t;
+        dragOff = createVector(mouseX - t.pos.x, mouseY - t.pos.y);
+        tiles.push(tiles.splice(i,1)[0]); // päällimmäiseksi
+      }
+      break;
+    }
+  }
+  if(!any) exploding = !exploding;
+}
+function mouseDragged(){
+  if(dragging){
+    dragging.pos.set(mouseX - dragOff.x, mouseY - dragOff.y);
+    dragging.vel.mult(0);
+  }
+}
+function mouseReleased(){
+  if(dragging){
+    if(ui('snapOn').checked) snapTile(dragging);
+    dragging = null;
+  }
+}
+function keyPressed(){
+  if(key==='e'||key==='E') toggleMode();
+  if(key==='o'||key==='O') showGhost = !showGhost;
+  if(key==='s'||key==='S') saveCanvas('taidepeli_'+Date.now(),'png');
+  if(key==='j'||key==='J'){
+    const params = {
+      seed, pieces:P(),
+      morph:+ui('morph').value, palette:+ui('palette').value,
+      cohere:+ui('cohere').value, explode:+ui('explode').value,
+      turb:+ui('turb').value, editMode, exploding,
+      tiles: tiles.map(t=>({x:t.pos.x,y:t.pos.y, ang:t.ang, scale:t.scale, hue:t.hue}))
+    };
+    const blob = new Blob([JSON.stringify(params,null,2)], {type:'application/json'});
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download='asetukset_'+Date.now()+'.json'; a.click();
+  }
+}
+
+/* --------- SNAP (mosaiikkiin kiinnittyminen) --------- */
+function snapTile(t){
+  const R = +ui('snapRange').value;
+  const w1 = t.size.x*t.scale, h1 = t.size.y*t.scale;
+  let best = null, bestDist = Infinity;
+  for(const o of tiles){
+    if(o===t) continue;
+    const w2 = o.size.x*o.scale, h2 = o.size.y*o.scale;
+    const dx = t.pos.x - o.pos.x;
+    const dy = t.pos.y - o.pos.y;
+    const targetX = (w1+w2)/2, targetY = (h1+h2)/2;
+
+    if(Math.abs(dy) < (h1+h2)/2 * 0.35){
+      const gapR = Math.abs(dx - targetX);
+      const gapL = Math.abs(dx + targetX);
+      if(gapR <= R && gapR < bestDist){ bestDist = gapR; best = {x:o.pos.x + targetX, y:o.pos.y}; }
+      if(gapL <= R && gapL < bestDist){ bestDist = gapL; best = {x:o.pos.x - targetX, y:o.pos.y}; }
+    }
+    if(Math.abs(dx) < (w1+w2)/2 * 0.35){
+      const gapB = Math.abs(dy - targetY);
+      const gapT = Math.abs(dy + targetY);
+      if(gapB <= R && gapB < bestDist){ bestDist = gapB; best = {x:o.pos.x, y:o.pos.y + targetY}; }
+      if(gapT <= R && gapT < bestDist){ bestDist = gapT; best = {x:o.pos.x, y:o.pos.y - targetY}; }
+    }
+  }
+  if(best){
+    t.pos.x = lerp(t.pos.x, best.x, 0.9);
+    t.pos.y = lerp(t.pos.y, best.y, 0.9);
+    t.vel.mult(0);
+  }
+}
+
+/* ------------------ PIIRTO + FYSIIKKA + ÄÄNI ------------------ */
+function draw(){
+  background(14);
+  if(!srcImg) return;
+
+  if(showGhost){ push(); tint(255,40); image(gfx, 0, 0); pop(); }
+
+  const morph   = +ui('morph').value;
+  const palette = +ui('palette').value;
+  const cohere  = +ui('cohere').value;
+  const explode = +ui('explode').value;
+  const turb    = +ui('turb').value;
+
+  const warmSpot    = createVector(width*0.72, height*0.35);
+  const coolSpot    = createVector(width*0.28, height*0.65);
+  const neutralSpot = createVector(width*0.5,  height*0.5);
+
+  let totalSpeed = 0;
+
+  for(const t of tiles){
+    const sc = 0.0018;
+    const theta = noise(t.pos.x*sc, t.pos.y*sc, frameCount*0.01)*TWO_PI*2;
+    const flow = p5.Vector.fromAngle(theta).mult(1.1*turb);
+
+    const homeDir = p5.Vector.sub(t.home, t.pos);
+    const away    = homeDir.copy().mult(-1).setMag(explode*0.02);
+    const target  = exploding ? p5.Vector.add(t.home, away) : t.home.copy();
+    const steer   = p5.Vector.sub(target, t.pos).mult(cohere*(editMode?0.25:1));
+
+    let grav = createVector(0,0);
+    const h = t.hue;
+    if(palette>0){
+      let attractor;
+      if((h>=20 && h<=70) || (h>=330 || h<20)) attractor = warmSpot;
+      else if(h>=170 && h<=260) attractor = coolSpot;
+      else attractor = neutralSpot;
+      grav = p5.Vector.sub(attractor, t.pos).setMag(0.12*palette);
+    }
+
+    const time = frameCount*0.02 + t.home.x*0.001 + t.home.y*0.001;
+    const breath = 1 + (sin(time)*0.25 + 0.25) * morph;
+    t.scale = lerp(t.scale, breath, 0.15);
+    t.alpha = lerp(t.alpha, 255 - 90*morph*(1-noise(time)), 0.1);
+    const shearAmt = 0.15*morph;
+    t.shear.x = lerp(t.shear.x, map(noise(time, 1),0,1,-shearAmt,shearAmt), 0.2);
+    t.shear.y = lerp(t.shear.y, map(noise(time, 2),0,1,-shearAmt,shearAmt), 0.2);
+
+    if(!editMode && dragging!==t){ t.vel.add(flow).add(grav).add(steer); }
+    t.vel.limit(6 + morph*2);
+    t.pos.add(t.vel);
+    t.ang += t.avel*(0.6 + morph*0.8) + t.vel.mag()*0.01;
+
+    if(t.pos.x<-60) t.pos.x=width+60;
+    if(t.pos.x>width+60) t.pos.x=-60;
+    if(t.pos.y<-60) t.pos.y=height+60;
+    if(t.pos.y>height+60) t.pos.y=-60;
+
+    totalSpeed += t.vel.mag();
+
+    push();
+    translate(t.pos.x, t.pos.y);
+    rotate(t.ang*0.25);
+    shearX(t.shear.x); shearY(t.shear.y);
+    imageMode(CENTER);
+    tint(255, t.alpha);
+    image(t.img, 0, 0, t.size.x*t.scale, t.size.y*t.scale);
+    pop();
+    
+ 
+  }
+    // ÄÄNI: keskimääräinen nopeus ohjaa ääntä, vain jos päällä
+  if (audioStarted && osc) {
+    const avgSpeed = totalSpeed / max(1, tiles.length);
+    const freq = map(avgSpeed, 0, 8, 140, 880, true);
+    const vol  = soundOn ? map(avgSpeed, 0, 6, 0.05, 0.28, true) : 0.0;
+    const cut  = map(avgSpeed, 0, 6, 300, 5000, true);
+
+    osc.freq(freq, 0.2);
+    osc.amp(vol, 0.4);
+    filter.freq(cut);
+  
+  }
+}
+ // Oletuskuvien lataus
+function setSourceImage(img){
+  srcImg = img;
+  fitImageToCanvas();
+  makeTiles();
+}
+
+function useDefault(path){
+  loadImage(path,
+    img => setSourceImage(img),
+    err => { console.error('Kuvan lataus epäonnistui:', path, err);
+             alert('Kuvaa ei löytynyt: ' + path); }
+  );
+}
+
+// Pienet apufunktiot kirjain-napeille
+function toggleGhostUI(){
+  showGhost = !showGhost;
+  document.getElementById('kbO').classList.toggle('on', showGhost);
+}
+
+function savePNG(){
+  const stamp = new Date().toISOString().slice(0,19).replace(/[T:]/g,'-');
+  saveCanvas('echoform-'+stamp, 'png');
+}
+
+function saveLayoutJSON(){
+  // Talletetaan palojen olennainen tila (voit laajentaa tarpeen mukaan)
+  const data = tiles.map(t => ({
+    x:t.pos.x, y:t.pos.y, ang:t.ang, scale:t.scale, w:t.size.x, h:t.size.y
+  }));
+  saveJSON(data, 'echoform-layout.json');
+}
+// luotettava koon päivitys
+function sizeCanvasToWindow(){
+  const isMobile = window.matchMedia('(max-width: 768px)').matches;
+  const bar = document.getElementById('defaultImages');
+  const barH = bar ? (bar.offsetHeight || 56) : 56;
+  const uiEl = document.getElementById('ui');
+  const uiVisible = uiEl && !uiEl.classList.contains('collapsed');
+  const uiH = uiVisible ? (isMobile ? 110 : 120) : 0;
+  const reserve = barH + uiH;
+
+  const w = window.innerWidth;
+  const h = Math.max(220, window.innerHeight - reserve);
+  if (typeof resizeCanvas === 'function'){
+    resizeCanvas(w, h, true);
+    if (srcImg) fitImageToCanvas();
+  }
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  const uiEl   = document.getElementById('ui');
+  const uiBtn  = document.getElementById('uiToggle');
+
+  // --- UI:n tila + muisti ---
+  function setUICollapsed(collapsed){
+    uiEl.classList.toggle('collapsed', collapsed);
+    if (uiBtn){
+      uiBtn.setAttribute('aria-expanded', String(!collapsed));
+      uiBtn.textContent = collapsed ? 'Säädöt ▴' : 'Säädöt ▾';
+    }
+    localStorage.setItem('uiCollapsed', collapsed ? '1' : '0');
+    sizeCanvasToWindow();
+  }
+
+  // lataa aiempi tila
+  const saved = localStorage.getItem('uiCollapsed') === '1';
+  setUICollapsed(saved);
+
+  // nappi
+  if (uiBtn) uiBtn.addEventListener('click', () => {
+    setUICollapsed(!uiEl || uiEl.classList.contains('collapsed') ? false : true);
+  });
+
+  // --- kirjainnapit (jos käytössä) ---
+  const kb = id => document.getElementById(id);
+  const kbE = kb('kbE'), kbO = kb('kbO'), kbS = kb('kbS'), kbJ = kb('kbJ'), kbX = kb('kbExplode');
+  if(kbE) kbE.addEventListener('click', () => document.getElementById('toggleMode').click());
+  if(kbO) kbO.addEventListener('click', toggleGhostUI);
+  if(kbS) kbS.addEventListener('click', savePNG);
+  if(kbJ) kbJ.addEventListener('click', saveLayoutJSON);
+  if(kbX) kbX.addEventListener('click', () => {
+    exploding = !exploding;
+    kbX.textContent = exploding ? '💥' : '🔄';
+  });
+
+  // --- oletuskuvanapit (korostus + lataus) ---
+  function highlightButton(btnId){
+    document.querySelectorAll('#defaultImages button').forEach(b => b.classList.remove('active-image'));
+    const el = document.getElementById(btnId);
+    if(el) el.classList.add('active-image');
+  }
+  [
+    { id:'btnSuojaani', path:'hopeavuori_maija suojaani.png' },
+    { id:'btnRed',      path:'hopeavuori_maija_redgrid.jpg' },
+    { id:'btnGreen',    path:'hopeavuori_maija_greengrid.jpg' },
+    { id:'btnBlack',    path:'hopeavuori_maija_blackgrid.jpg' }
+  ].forEach(({ id, path }) => {
+    const b = document.getElementById(id);
+    if(!b) return;
+    b.addEventListener('mousedown', () => b.blur());
+    b.addEventListener('touchstart', () => b.blur());
+    b.addEventListener('click', () => { useDefault(path); highlightButton(id); b.blur(); });
+  });
+
+  // --- hätäpalautukset, jos nappi sattuisi peittymään ---
+  // tuplaklikkaa ihan yläreunaa → tuo UI takaisin
+  document.addEventListener('dblclick', e => { if (e.clientY < 80) setUICollapsed(false); });
+  // näppäin 'u' → tuo UI takaisin
+  document.addEventListener('keydown', e => { if (e.key.toLowerCase() === 'u') setUICollapsed(false); });
+
+  // alkuvaiheen mitoitus ja korjaus pienen viiveen jälkeen (osoitepalkki)
+  sizeCanvasToWindow();
+  setTimeout(sizeCanvasToWindow, 400);
+});
+
+// reagoidaan koon muutoksiin luotettavasti
+['load','resize','orientationchange','visibilitychange'].forEach(ev => {
+  window.addEventListener(ev, () => {
+    clearTimeout(window.__rsz);
+    window.__rsz = setTimeout(sizeCanvasToWindow, ev === 'orientationchange' ? 300 : 120);
+  });
+});
+
+// poista automaattinen focus
+window.addEventListener('load', () => {
+  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+});
+
+
+
+
+
+
+</script>
+</body>
+</html>

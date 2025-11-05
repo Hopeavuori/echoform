@@ -233,20 +233,59 @@ input[type="range"]{ touch-action: none; }
   background: #178c68;
   box-shadow: 0 0 8px rgba(42,183,139,.5);
 }
+/* Alapalkki */
+#controlBar{
+  position:fixed;
+  bottom:10px; left:10px; right:10px;
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  z-index:9999;
+}
+#controlBar button{
+  background:#2ab78b;
+  color:#fff;
+  border:0;
+  padding:6px 10px;
+  border-radius:8px;
+  cursor:pointer;
+}
+#controlBar button.active-image{
+  background:#178c68;
+  box-shadow:0 0 8px rgba(42,183,139,.5);
+}
+
+/* Säädöt-paneeli (aina näkyvissä kun käyttäjä valitsee Säädöt) */
+#ui{
+  position:fixed;
+  left:10px; right:10px;
+  bottom:70px;
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  background:#151515;
+  padding:10px;
+  border-radius:12px;
+}
+
+/* Mobiili → UI koko leveys, pystysuuntaan */
+@media (max-width:768px){
+  #ui{ flex-direction:column; align-items:stretch; }
+  #controlBar{ justify-content:flex-start; overflow-x:auto; }
+}
 
 </style>
 </head>
 <body>
 <!-- Valitse kuva -->
-<div id="defaultImages">
-  <button id="btnSuojaani" type="button">Suojaani</button>
-  <button id="btnRed" type="button">Redgrid</button>
-  <button id="btnGreen" type="button">Greengrid</button>
-  <button id="btnBlack" type="button">Blackgrid</button>
-
-  <!-- ✅ Säädöt-nappi samaan riviin -->
-  <button id="uiToggle" type="button" aria-expanded="true">Säädöt ▾</button>
+<div id="controlBar">
+  <button id="btnSuojaani">Suojaani</button>
+  <button id="btnRed">Redgrid</button>
+  <button id="btnGreen">Greengrid</button>
+  <button id="btnBlack">Blackgrid</button>
+  <button id="toggleUI">Säädöt</button>
 </div>
+
 
 
 
@@ -264,15 +303,15 @@ input[type="range"]{ touch-action: none; }
 
 <div id="ui">
   <div class="hint">
-    E = Edit/Play • O = Ghost • Klikkaa tyhjää: räjähdä/kokoonnu • S = PNG • J = JSON
+    E = Edit/Play • O = Ghost • Klikkaa tyhjää räjäyttää/kokoaa
   </div>
 
   <div class="kb">
-    <button id="kbE" type="button" title="Edit/Play">E</button>
-    <button id="kbO" type="button" title="Ghost">O</button>
-    <button id="kbExplode" type="button" title="Explode / Assemble">💥</button>
-    <button id="kbS" type="button" title="Save PNG">S</button>
-    <button id="kbJ" type="button" title="Save JSON">J</button>
+    <button id="kbE">E</button>
+    <button id="kbO">O</button>
+    <button id="kbExplode">💥</button>
+    <button id="kbS">S</button>
+    <button id="kbJ">J</button>
   </div>
 
   <input type="file" id="picker" accept="image/*" />
@@ -344,6 +383,9 @@ function sizeCanvasToWindow(){
   resizeCanvas(w, h, true);
   if(srcImg){ fitImageToCanvas(); }  // päivitä kuvan skaalaus
 }
+// Ota talteen viittaukset ennen setUICollapsed-funktiota
+const uiEl  = document.getElementById('ui');
+const uiBtn = document.getElementById('toggleUI');
 
 // kutsu heti ja myös koon muuttuessa
 window.addEventListener('load', sizeCanvasToWindow);
@@ -723,45 +765,43 @@ function saveLayoutJSON(){
 }
 // luotettava koon päivitys
 function sizeCanvasToWindow(){
-  const isMobile = window.matchMedia('(max-width: 768px)').matches;
-  const bar = document.getElementById('defaultImages');
-  const barH = bar ? (bar.offsetHeight || 56) : 56;
+  const bar = document.getElementById('controlBar');
   const uiEl = document.getElementById('ui');
-  const uiVisible = uiEl && !uiEl.classList.contains('collapsed');
-  const uiH = uiVisible ? (isMobile ? 110 : 120) : 0;
-  const reserve = barH + uiH;
-
+  const reserve = (bar?.offsetHeight || 60) + (uiEl?.offsetHeight || 120);
   const w = window.innerWidth;
-  const h = Math.max(220, window.innerHeight - reserve);
-  if (typeof resizeCanvas === 'function'){
-    resizeCanvas(w, h, true);
-    if (srcImg) fitImageToCanvas();
+  const h = Math.max(200, window.innerHeight - reserve);
+  resizeCanvas(w, h, true);
+  if(srcImg) fitImageToCanvas();
+}
+window.addEventListener('load', sizeCanvasToWindow);
+window.addEventListener('resize', () => setTimeout(sizeCanvasToWindow, 80));
+
+
+ // --- UI:n tila + muisti ---
+function setUICollapsed(collapsed){
+  if (uiEl){
+    uiEl.style.display = collapsed ? 'none' : 'flex';
   }
+  if (uiBtn){
+    uiBtn.setAttribute('aria-expanded', String(!collapsed));
+    uiBtn.textContent = collapsed ? 'Säädöt ▴' : 'Säädöt ▾';
+  }
+  localStorage.setItem('uiCollapsed', collapsed ? '1' : '0');
+  if (typeof sizeCanvasToWindow === 'function') sizeCanvasToWindow();
 }
 
-window.addEventListener('DOMContentLoaded', () => {
-  const uiEl   = document.getElementById('ui');
-  const uiBtn  = document.getElementById('uiToggle');
+// lataa aiempi tila
+const saved = localStorage.getItem('uiCollapsed') === '1';
+setUICollapsed(saved);
 
-  // --- UI:n tila + muisti ---
-  function setUICollapsed(collapsed){
-    uiEl.classList.toggle('collapsed', collapsed);
-    if (uiBtn){
-      uiBtn.setAttribute('aria-expanded', String(!collapsed));
-      uiBtn.textContent = collapsed ? 'Säädöt ▴' : 'Säädöt ▾';
-    }
-    localStorage.setItem('uiCollapsed', collapsed ? '1' : '0');
-    sizeCanvasToWindow();
-  }
-
-  // lataa aiempi tila
-  const saved = localStorage.getItem('uiCollapsed') === '1';
-  setUICollapsed(saved);
-
-  // nappi
-  if (uiBtn) uiBtn.addEventListener('click', () => {
-    setUICollapsed(!uiEl || uiEl.classList.contains('collapsed') ? false : true);
+// napin klikkaus
+if (uiBtn){
+  uiBtn.addEventListener('click', () => {
+    const nowCollapsed = uiEl ? (uiEl.style.display !== '' && uiEl.style.display !== 'flex') : false;
+    setUICollapsed(!nowCollapsed);
   });
+}
+
 
   // --- kirjainnapit (jos käytössä) ---
   const kb = id => document.getElementById(id);
@@ -777,7 +817,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
   // --- oletuskuvanapit (korostus + lataus) ---
   function highlightButton(btnId){
-    document.querySelectorAll('#defaultImages button').forEach(b => b.classList.remove('active-image'));
+    document.querySelectorAll('#controlBar button').forEach(b => b.classList.remove('active-image'));
     const el = document.getElementById(btnId);
     if(el) el.classList.add('active-image');
   }
@@ -800,48 +840,37 @@ window.addEventListener('DOMContentLoaded', () => {
   // näppäin 'u' → tuo UI takaisin
   document.addEventListener('keydown', e => { if (e.key.toLowerCase() === 'u') setUICollapsed(false); });
 
-// --- KOKO MITOITUSLOHKON KORJATTU VERSIO ---
-
-function sizeCanvasToWindow(){
-  const uiReserve = (window.innerWidth <= 768) ? 180 : 120; // tilaa UI:lle
-  const w = window.innerWidth;
-  const h = Math.max(200, window.innerHeight - uiReserve);
-  resizeCanvas(w, h, true);
-  if (srcImg) fitImageToCanvas();
-}
-
-// 1) Kun sivu latautuu: aja mitoitus useita kertoja (osoitepalkin takia)
-window.addEventListener('load', () => {
+  // alkuvaiheen mitoitus ja korjaus pienen viiveen jälkeen (osoitepalkki)
   sizeCanvasToWindow();
-  setTimeout(sizeCanvasToWindow, 200);
-  setTimeout(sizeCanvasToWindow, 450);
-  setTimeout(sizeCanvasToWindow, 900);
+  setTimeout(sizeCanvasToWindow, 400);
+
+
+// reagoidaan koon muutoksiin luotettavasti
+['load','resize','orientationchange','visibilitychange'].forEach(ev => {
+  window.addEventListener(ev, () => {
+    clearTimeout(window.__rsz);
+    window.__rsz = setTimeout(sizeCanvasToWindow, ev === 'orientationchange' ? 300 : 120);
+  });
 });
 
-// 2) Ruudun suunnan vaihto
-window.addEventListener('orientationchange', () => {
-  setTimeout(sizeCanvasToWindow, 300);
+// poista automaattinen focus
+window.addEventListener('load', () => {
+  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
 });
 
-// 3) Ikkunan koon muutos (debounce)
-window.addEventListener('resize', () => {
-  clearTimeout(window.__rsz);
-  window.__rsz = setTimeout(sizeCanvasToWindow, 120);
-});
-
-// 4) Paluu sivulle selaimen välimuistista (bfcache)
-window.addEventListener('pageshow', (e) => {
-  if (e.persisted) setTimeout(sizeCanvasToWindow, 150);
-});
-
-// 5) Vieritys (osoitepalkin piiloutuminen mobiilissa)
-let __scrollTick;
-window.addEventListener('scroll', () => {
-  clearTimeout(__scrollTick);
-  __scrollTick = setTimeout(sizeCanvasToWindow, 120);
-}, { passive: true });
-
-
+// Säädöt-napin toiminto: näytä/piilota UI ja mitoita canvas
+const toggleBtn = document.getElementById('toggleUI');
+if (toggleBtn) {
+  toggleBtn.addEventListener('click', () => {
+    const panel = document.getElementById('ui');
+    const nowHidden = (panel.style.display === 'none');
+    panel.style.display = nowHidden ? 'flex' : 'none';
+    // mitoita canvas uudelleen
+    if (typeof sizeCanvasToWindow === 'function') {
+      setTimeout(sizeCanvasToWindow, 0);
+    }
+  });
+}
 
 
 
@@ -850,4 +879,3 @@ window.addEventListener('scroll', () => {
 </script>
 </body>
 </html>
-

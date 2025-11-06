@@ -264,6 +264,70 @@ input[type="range"]{ touch-action: none; }
   }
   #controlBar{ justify-content:flex-start; overflow-x:auto; }
 }
+/* Yhteinen ruudukko säätimille */
+.ui-grid{
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  width: 100%;
+}
+.ui-grid.tight{
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+/* Label + slider – pystypino ja tiiviit marginaalit */
+#ui label{
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: #151515;
+  padding: 8px 10px;
+  border-radius: 10px;
+}
+#ui input[type="range"]{ width: 100%; }
+
+#ui .checkbox-row{
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Vetovalikko (details) */
+#advSettings{
+  width: 100%;
+  background: #121212;
+  border: 1px solid #1f1f1f;
+  border-radius: 12px;
+  padding: 6px 8px;
+}
+#advSettings > summary{
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+  font-weight: 600;
+  padding: 4px 6px 8px 2px;
+}
+#advSettings[open] > summary{ opacity: .9; }
+
+/* Nappi tyyli "Arvo palat" */
+#ui .primary{
+  background:#2ab78b;
+  color:#fff;
+  border:0;
+  padding:10px 12px;
+  border-radius:10px;
+  cursor:pointer;
+  font-weight:600;
+}
+
+/* Mobiilisti tiiviimmät paddaukset, pienempi min-leveys */
+@media (max-width:768px){
+  .ui-grid{ grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; }
+  .ui-grid.tight{ grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); }
+  #ui > *{ padding: 6px 8px; }
+  #advSettings{ padding: 4px 6px; }
+  #advSettings > summary{ padding: 2px 2px 6px 0; }
+}
 
 
 </style>
@@ -307,17 +371,47 @@ input[type="range"]{ touch-action: none; }
   </div>
 
   <input type="file" id="picker" accept="image/*" />
-  <label>Palojen määrä <input type="range" id="pieces" min="60" max="500" value="220"></label>
-  <label>Metamorfoosi <input type="range" id="morph" min="0" max="1" step="0.01" value="0.55"></label>
-  <label>Paletti-gravitaatio <input type="range" id="palette" min="0" max="2" step="0.01" value="1.0"></label>
-  <label>Kasaantuminen <input type="range" id="cohere" min="0" max="1" step="0.01" value="0.10"></label>
-  <label>Hajotus <input type="range" id="explode" min="0" max="500" value="260"></label>
-  <label>Turbulenssi <input type="range" id="turb" min="0" max="2" step="0.01" value="0.6"></label>
+
+  <!-- Perussäädöt (aina näkyvissä) -->
+  <div class="ui-grid">
+    <label>Palojen määrä
+      <input type="range" id="pieces" min="60" max="500" value="220">
+    </label>
+    <label>Metamorfoosi
+      <input type="range" id="morph" min="0" max="1" step="0.01" value="0.55">
+    </label>
+    <label>Paletti
+      <input type="range" id="palette" min="0" max="2" step="0.01" value="1.0">
+    </label>
+  </div>
+
+  <!-- Lisäasetukset (mobiilissa kiinni, desktopilla auki) -->
+  <details id="advSettings">
+    <summary>Lisäasetukset ▾</summary>
+    <div class="ui-grid tight">
+      <label>Kasaantuminen
+        <input type="range" id="cohere" min="0" max="1" step="0.01" value="0.10">
+      </label>
+      <label>Hajotus
+        <input type="range" id="explode" min="0" max="500" value="260">
+      </label>
+      <label>Turbulenssi
+        <input type="range" id="turb" min="0" max="2" step="0.01" value="0.6">
+      </label>
+      <label>Snap-etäisyys
+        <input type="range" id="snapRange" min="4" max="80" value="28">
+      </label>
+      <label class="checkbox-row">
+        <input type="checkbox" id="snapOn" checked>
+        <span>Snap päällä</span>
+      </label>
+      <button id="reshuffle" type="button" class="primary">Arvo palat</button>
+    </div>
+  </details>
+
   <div class="pill" id="toggleMode">▶ Play</div>
-  <label>Snap-etäisyys <input type="range" id="snapRange" min="4" max="80" value="28"></label>
-  <label><input type="checkbox" id="snapOn" checked> Snap päällä</label>
-  <button id="reshuffle">Arvo palat</button>
 </div>
+
 
 
 
@@ -387,6 +481,12 @@ document.addEventListener('DOMContentLoaded', () => {
     { id:'btnGreen',    path:'hopeavuori_maija_greengrid.jpg' },
     { id:'btnBlack',    path:'hopeavuori_maija_blackgrid.jpg' }
   ];
+document.addEventListener('DOMContentLoaded', () => {
+  const adv = document.getElementById('advSettings');
+  if (!adv) return;
+  const isMobile = window.matchMedia('(max-width: 768px)').matches;
+  adv.open = !isMobile;  // desktop = auki, mobiili = kiinni
+});
 
   function highlightButton(id){
     document.querySelectorAll('#controlBar button')

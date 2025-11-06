@@ -394,7 +394,7 @@ function makeTiles(){
         home:createVector(cx,cy),
         pos:createVector(cx + random(-40,40), cy + random(-40,40)),
         vel:p5.Vector.random2D().mult(random(0.5,2)),
-        ang:random(TWO_PI), avel:random(-0.06,0.06)),
+        ang:random(TWO_PI), avel:random(-0.06,0.06),
         size:createVector(sw,sh), scale:1, alpha:255,
         shear:createVector(random(-0.12,0.12), random(-0.12,0.12))
       });
@@ -582,3 +582,4 @@ function calmImpulse(){ for (const t of tiles){ t.vel.mult(0.35); } }
 </script>
 </body>
 </html>
+

@@ -328,6 +328,43 @@ input[type="range"]{ touch-action: none; }
   #advSettings{ padding: 4px 6px; }
   #advSettings > summary{ padding: 2px 2px 6px 0; }
 }
+/* Varmista että UI voi kasvaa/scrollata eikä leikkaa sisältöä pois */
+html, body { height: 100%; }
+
+#ui{
+  position: relative;
+  overflow: auto;                    /* sallii Lisäasetusten avautua */
+  max-height: calc(100vh - 160px);   /* jää tilaa yläpalkille/canvasille */
+  -webkit-overflow-scrolling: touch; /* sulava scrollaus iOS:ssä */
+}
+
+/* details/summary -paneelin peruskäytös */
+#advSettings {
+  background: #101010;
+  border-radius: 12px;
+  padding: 6px 10px;
+  margin-top: 8px;
+}
+#advSettings > summary {
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  padding: 8px 0;
+}
+#advSettings summary::-webkit-details-marker { display: none; }
+
+/* Piilota sisältö, kun paneeli on kiinni (varmistus vanhoille mobiiliselaimille) */
+#advSettings .ui-grid { display: none; }
+#advSettings[open] .ui-grid { display: grid; }
+
+/* Mobiilissa tiiviimpi ruudukko, ettei mikään jää näkymättömiin */
+@media (max-width: 768px){
+  #ui{ max-height: calc(100vh - 140px); }
+  .ui-grid, .ui-grid.tight{
+    grid-template-columns: 1fr;   /* yksi sarake = kaikki mahtuu */
+    gap: 10px;
+  }
+}
 
 
 </style>
@@ -1012,6 +1049,28 @@ if (toggleBtn) {
     }
   });
 }
+// Avaa Lisäasetukset desktopilla, sulje mobiilissa
+(function(){
+  const adv = document.getElementById('advSettings');
+
+  function setDetailsByViewport(){
+    if (!adv) return;
+    if (window.innerWidth <= 768){
+      adv.removeAttribute('open');  // mobiilissa kiinni
+    } else {
+      adv.setAttribute('open','');  // desktopilla auki
+    }
+  }
+
+  // Kutsu heti ja myös koon muuttuessa
+  setDetailsByViewport();
+  window.addEventListener('resize', setDetailsByViewport);
+
+  // Kun canvasin kokoa muutetaan, anna DOMille reflow
+  window.addEventListener('resize', () => {
+    requestAnimationFrame(() => { document.body.style.height = 'auto'; });
+  });
+})();
 
 
 

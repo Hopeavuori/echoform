@@ -60,7 +60,6 @@
   #advSettings .ui-grid{ display:none; }
   #advSettings[open] .ui-grid{ display:grid; }
   @media (max-width:768px){
-    /* Mobiilissa Lisäasetukset AINA näkyvissä */
     #advSettings .ui-grid{ display:grid !important; }
     .ui-grid{ grid-template-columns:1fr; gap:8px; }
   }
@@ -70,46 +69,34 @@
     background:#2ab78b; color:#fff; border:0; padding:10px 12px; border-radius:10px; cursor:pointer; font-weight:600;
   }
 
-  /* Keskellä näkyvä käynnistysnappi äänelle */
+  /* Äänen käynnistysnappi */
   #startAudio{
     position:fixed; inset:50% auto auto 50%; transform:translate(-50%,-50%);
     font-size:16px; padding:10px 16px; border-radius:12px; background:#2ab78b; color:#fff;
     border:none; cursor:pointer; z-index:9999;
   }
 
- /* AINA näkyvä kirjainnappirivi */
-#kbDock{
-  position: fixed;
-  top: 10px;               /* desktop: yläreunassa */
-  left: 10px; right: 10px;
-  display: flex; gap: 10px; flex-wrap: wrap;
-  z-index: 10001;
-}
-#kbDock button{
-  min-width: 42px; height: 42px; border-radius: 12px;
-  background:#2ab78b; color:#fff; border:0; font-weight:700; cursor:pointer;
-}
-
-/* Mobiilissa siirrä napit ALAS controlBarin yläpuolelle */
-@media (max-width: 768px){
+  /* AINA näkyvä kirjainnappirivi – sijoitus dynaamisesti JS:llä */
   #kbDock{
-    top: auto;
-    left: auto;
-    right: 10px;
-    bottom: calc(60px + var(--safe-bottom) + 8px); /* juuri controlBarin yläpuolelle */
-    width: auto;
-    justify-content: flex-end;
+    position: fixed;
+    left: 10px; right: 10px;
+    bottom: 120px;                 /* fallback – JS laskee tarkan */
+    display: flex; flex-wrap: wrap; gap: 10px;
+    justify-content: center;
+    z-index: 10001;
   }
   #kbDock button{
-    min-width: 38px; height: 38px; border-radius: 10px;
+    min-width: 42px; height: 42px; border-radius: 12px;
+    background:#2ab78b; color:#fff; border:0; font-weight:700; cursor:pointer;
   }
-}
-
+  @media (max-width:768px){
+    #kbDock button{ min-width:38px; height:38px; border-radius:10px; }
+  }
 </style>
 </head>
 <body>
 
-<!-- AINA NÄKYVÄ kirjainnappirivi (delegoi klikkaukset UI:n napeille) -->
+<!-- AINA NÄKYVÄ kirjainnappirivi (delegoi klikkaukset “virtuaalinapeille”) -->
 <div id="kbDock">
   <button data-kb="#kbE">E</button>
   <button data-kb="#kbO">O</button>
@@ -124,7 +111,7 @@
   <button id="btnRed">Redgrid</button>
   <button id="btnGreen">Greengrid</button>
   <button id="btnBlack">Blackgrid</button>
-  <button id="toggleUI">Säädöt</button>
+  <button id="toggleUI">Säädöt piiloon</button>
 </div>
 
 <button id="startAudio">▶ Käynnistä ääni</button>
@@ -139,8 +126,6 @@
 <!-- UI-paneeli -->
 <div id="ui">
   <div class="hint">E = Edit/Play • O = Ghost • Klikkaa tyhjää räjäyttää/kokoaa</div>
-
-  <!-- (poistettu: toiset kirjainnapit) -->
 
   <input type="file" id="picker" accept="image/*" />
 
@@ -265,14 +250,28 @@ function sizeCanvasToWindow(){
 
   // Päivitä dynaaminen alatyhjä bodylle
   document.documentElement.style.setProperty('--uih', (uiEl ? uiEl.offsetHeight + 16 : 316) + 'px');
+
+  // Päivitä napparivit
+  layoutBars();
+}
+
+/* kirjainnappien ankkurointi controlBarin yläpuolelle */
+function layoutBars(){
+  const bar = document.getElementById('controlBar');
+  const kb  = document.getElementById('kbDock');
+  if(!kb) return;
+  const safe = parseInt(getComputedStyle(document.documentElement)
+               .getPropertyValue('--safe-bottom')) || 0;
+  const barH = (bar?.offsetHeight || 0) + 10 + safe; // bar + väli + safe
+  kb.style.bottom = (barH + 8) + 'px';               // juuri barin yläpuolelle
 }
 
 ['load','resize','orientationchange','pageshow'].forEach(ev=>{
-  window.addEventListener(ev, ()=>{ clearTimeout(window.__vh); window.__vh=setTimeout(sizeCanvasToWindow, 120); });
+  window.addEventListener(ev, ()=>{ clearTimeout(window.__vh); window.__vh=setTimeout(()=>{ sizeCanvasToWindow(); layoutBars(); }, 120); });
 });
 if (window.visualViewport){
-  visualViewport.addEventListener('resize', ()=>{ clearTimeout(window.__vv); window.__vv=setTimeout(sizeCanvasToWindow, 120); });
-  visualViewport.addEventListener('scroll', ()=>{ clearTimeout(window.__vv2); window.__vv2=setTimeout(sizeCanvasToWindow, 120); });
+  visualViewport.addEventListener('resize', ()=>{ clearTimeout(window.__vv); window.__vv=setTimeout(()=>{ sizeCanvasToWindow(); layoutBars(); }, 120); });
+  visualViewport.addEventListener('scroll', ()=>{ clearTimeout(window.__vv2); window.__vv2=setTimeout(layoutBars, 120); });
 }
 
 /* ------------------ P5 elinkaari ------------------ */
@@ -289,7 +288,7 @@ function setup(){
   ui('reshuffle').onclick = ()=>{ if(srcImg) makeTiles(); };
   ui('toggleMode').onclick = ()=>toggleMode();
 
-  // AINA NÄKYVÄ KB-dock: delegoi UI-nappeihin
+  // AINA NÄKYVÄ KB-dock: delegoi “virtuaalinapeille”
   document.getElementById('kbDock')?.addEventListener('click', (e)=>{
     const btn = e.target.closest('button[data-kb]');
     if(!btn) return;
@@ -307,56 +306,47 @@ function setup(){
     const b = document.getElementById(id); if(!b) return;
     b.addEventListener('mousedown', () => b.blur());
     b.addEventListener('touchstart', () => b.blur());
-    b.addEventListener('click', () => { useDefault(path); highlightButton(id); });
+    b.addEventListener('click', () => { useDefault(path); highlightButton(id); layoutBars(); });
   });
 
-  // Säädöt-napin toggle + keskityksen säilytys
- const toggleBtn = document.getElementById('toggleUI');
-
-function updateToggleUIButton(){
-  const panel = document.getElementById('ui');
-  const visible = getComputedStyle(panel).display !== 'none';
-  toggleBtn.textContent = visible ? 'Säädöt piiloon' : 'Säädöt esiin';
-}
-
-toggleBtn?.addEventListener('click', () => {
-  const panel = document.getElementById('ui');
-  const wasVisible = getComputedStyle(panel).display !== 'none';
-
-  const oldW = width, oldH = height;
-  panel.style.display = wasVisible ? 'none' : 'flex';
-  sizeCanvasToWindow();
-
-  const newW = width, newH = height;
-  const dx = (newW - oldW) * 0.5;
-  const dy = (newH - oldH) * 0.5;
-  if (tiles && tiles.length){
-    for (const t of tiles){
-      t.pos.x += dx; t.pos.y += dy;
-      t.home.x += dx; t.home.y += dy;
-    }
+  // Säädöt-napin toggle + keskityksen säilytys + napin teksti
+  const toggleBtn = document.getElementById('toggleUI');
+  function updateToggleUIButton(){
+    const panel = document.getElementById('ui');
+    const visible = getComputedStyle(panel).display !== 'none';
+    toggleBtn.textContent = visible ? 'Säädöt piiloon' : 'Säädöt esiin';
   }
+  toggleBtn?.addEventListener('click', () => {
+    const panel = document.getElementById('ui');
+    const wasVisible = getComputedStyle(panel).display !== 'none';
 
+    const oldW = width, oldH = height;
+    panel.style.display = wasVisible ? 'none' : 'flex';
+    sizeCanvasToWindow();
+
+    const newW = width, newH = height;
+    const dx = (newW - oldW) * 0.5;
+    const dy = (newH - oldH) * 0.5;
+    if (tiles && tiles.length){
+      for (const t of tiles){ t.pos.x += dx; t.pos.y += dy; t.home.x += dx; t.home.y += dy; }
+    }
+    updateToggleUIButton();
+    layoutBars();
+  });
   updateToggleUIButton();
-});
 
-// Aseta oikea teksti sivun käynnistyksessä
-updateToggleUIButton();
-
-
-  // Kirjainnappien logiikka (näkyvät kbDockissa):
-  const kb = id => document.getElementById(id);
-  // Luo "virtuaalinapit" joita kbDock käyttää:
-  const vBtn = (id, fn) => { const b=document.createElement('button'); b.id=id; b.style.display='none'; b.onclick=fn; document.body.appendChild(b); };
-  vBtn('kbE', ()=> ui('toggleMode').click());
-  vBtn('kbO', ()=> { showGhost = !showGhost; });
-  vBtn('kbP', savePNG);
-  vBtn('kbJ', saveJPG);
-  vBtn('kbExplode', () => { exploding = !exploding; if (exploding) burstImpulse(); else calmImpulse(); });
+  /* Virtuaalinapit kbDockille */
+  const mk = (id, fn) => { const b=document.createElement('button'); b.id=id; b.style.display='none'; b.onclick=fn; document.body.appendChild(b); };
+  mk('kbE', ()=> ui('toggleMode').click());
+  mk('kbO', ()=> { showGhost = !showGhost; });
+  mk('kbP', savePNG);
+  mk('kbJ', saveJPG);
+  mk('kbExplode', () => { exploding = !exploding; if (exploding) burstImpulse(); else calmImpulse(); });
 
   sizeCanvasToWindow();
+  layoutBars();
 }
-function windowResized(){ sizeCanvasToWindow(); }
+function windowResized(){ sizeCanvasToWindow(); layoutBars(); }
 
 function loadFromFile(file){
   const reader = new FileReader();
@@ -404,7 +394,7 @@ function makeTiles(){
         home:createVector(cx,cy),
         pos:createVector(cx + random(-40,40), cy + random(-40,40)),
         vel:p5.Vector.random2D().mult(random(0.5,2)),
-        ang:random(TWO_PI), avel:random(-0.06,0.06),
+        ang:random(TWO_PI), avel:random(-0.06,0.06)),
         size:createVector(sw,sh), scale:1, alpha:255,
         shear:createVector(random(-0.12,0.12), random(-0.12,0.12))
       });

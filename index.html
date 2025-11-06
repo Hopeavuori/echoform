@@ -365,6 +365,67 @@ html, body { height: 100%; }
     gap: 10px;
   }
 }
+/* UI kiinni ruudun alaosaan (mobiiliystävällinen) */
+#ui{
+  position: fixed;
+  left: 0; right: 0;
+  bottom: env(safe-area-inset-bottom, 0);
+  z-index: 9998;
+  background: rgba(10,10,10,.92);
+  backdrop-filter: blur(6px);
+  border-top: 1px solid #2ab78b33;
+  padding: 12px 14px calc(12px + env(safe-area-inset-bottom, 0));
+  max-height: clamp(220px, 45vh, 420px);  /* mahtuu pienillekin näytöille */
+  overflow: auto;                         /* skrollaa tarvittaessa */
+}
+
+/* Näppäinrivi näkyväksi ja tiiviiksi */
+.kb{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 8px 0 10px;
+}
+.kb button{
+  min-width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  font-weight: 700;
+}
+
+/* Perussäädöt ruudukoksi; mobiilissa yksi sarake */
+.ui-grid{
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0,1fr));
+  gap: 10px;
+}
+.ui-grid.tight{ gap: 10px; }
+
+@media (max-width:768px){
+  .ui-grid, .ui-grid.tight{
+    grid-template-columns: 1fr; /* yksi sarake = kaikki mahtuu */
+  }
+}
+
+/* details/summary – varmista aukeaminen */
+#advSettings{
+  background:#101010;
+  border-radius:12px;
+  padding: 6px 10px;
+  margin-top: 8px;
+}
+#advSettings > summary{
+  cursor:pointer;
+  list-style:none;
+  user-select:none;
+  padding: 8px 0;
+}
+#advSettings summary::-webkit-details-marker{ display:none; }
+#advSettings .ui-grid{ display:none; }
+#advSettings[open] .ui-grid{ display:grid; }
+
+/* Jätä tilaa canvasille UI:n alle */
+body{ padding-bottom: var(--uih, 300px); }
 
 
 </style>
@@ -377,6 +438,15 @@ html, body { height: 100%; }
   <button id="btnGreen">Greengrid</button>
   <button id="btnBlack">Blackgrid</button>
   <button id="toggleUI">Säädöt</button>
+</div>
+
+<div class="kb">
+  <button id="kbE">E</button>
+  <button id="kbO">O</button>
+  <button id="kbExplode">💥</button>
+  <button id="kbP">P</button>   <!-- UUSI -->
+  <button id="kbS">S</button>
+  <button id="kbJ">J</button>
 </div>
 
 
@@ -1072,6 +1142,43 @@ if (toggleBtn) {
   });
 })();
 
+// Avaa/sulje Lisäasetukset näyttöleveyden mukaan ja pidä UI:n tila dynaamisena
+(function(){
+  const adv = document.getElementById('advSettings');
+  const ui  = document.getElementById('ui');
+
+  function setDetailsByViewport(){
+    if (!adv) return;
+    if (window.innerWidth <= 768){
+      adv.removeAttribute('open');     // mobiilissa kiinni
+    } else {
+      adv.setAttribute('open','');      // desktopilla auki
+    }
+  }
+
+  function updateBodyBottomPadding(){
+    // jätetään canvasille tilaa UI:n verran
+    const h = ui ? ui.offsetHeight : 300;
+    document.documentElement.style.setProperty('--uih', (h + 16) + 'px');
+  }
+
+  // Ensimmäinen asetus ja kuuntelijat
+  setDetailsByViewport();
+  updateBodyBottomPadding();
+
+  window.addEventListener('resize', () => {
+    setDetailsByViewport();
+    // anna layoutille reflow ennen korkeuden mittausta
+    requestAnimationFrame(updateBodyBottomPadding);
+  });
+
+  // Kun details aukeaa/sulkeutuu, päivitä padding
+  if (adv){
+    adv.addEventListener('toggle', () => {
+      requestAnimationFrame(updateBodyBottomPadding);
+    });
+  }
+})();
 
 
 
